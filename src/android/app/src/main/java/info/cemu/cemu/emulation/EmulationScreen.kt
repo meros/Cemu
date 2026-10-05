@@ -59,6 +59,9 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.currentStateAsState
 import androidx.lifecycle.viewmodel.MutableCreationExtras
 import androidx.lifecycle.viewmodel.compose.viewModel
 import info.cemu.cemu.R
@@ -435,8 +438,13 @@ private fun EmulationSurfaces(
 
     val padDisplay = if (activity != null) rememberPadDisplay(activity) else null
     val isPadVisibleEffective = sideMenuState.isPadVisible && isEmulationInitialized
-    val usePadPresentation =
+    // The pad window is a separate window on the other display. It does not stop with the
+    // activity, so it stays on screen, frozen, while the game is in the background.
+    val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
+    val isActivityStarted = lifecycleState.isAtLeast(Lifecycle.State.STARTED)
+    val isPadOnExternalScreen =
         isPadVisibleEffective && sideMenuState.isPadOnExternalDisplay && padDisplay != null
+    val usePadPresentation = isPadOnExternalScreen && isActivityStarted
 
     val mainTouchListener = remember { CanvasOnTouchListener() }
     val padTouchListener = remember { CanvasOnTouchListener() }
@@ -494,7 +502,7 @@ private fun EmulationSurfaces(
             afterInit = { viewModel.initializeEmulation() },
         )
 
-        if (isPadVisibleEffective && !usePadPresentation) {
+        if (isPadVisibleEffective && !isPadOnExternalScreen) {
             EmulationSurface(
                 modifier = itemModifier,
                 holderCallback = viewModel.padHolderCallback,
